@@ -61,6 +61,7 @@ lib.callback.register('lumi_bossapp:getDashboard', function(source)
     return {
         allowed = tonumber(bossGrade) == 1,
         message = tonumber(bossGrade) == 1 and 'OK' or 'Du bist kein Boss.',
+		locale = Config.Locale or 'de',
         job = jobName,
         label = job.label or jobName,
         grade = job.grade_label or tostring(grade),
@@ -125,6 +126,95 @@ local function IsBoss(xPlayer)
 
     return tonumber(bossGrade) == 1
 end
+
+lib.callback.register('lumi_bossapp:getNearbyPlayers', function(source)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    if not xPlayer then return {} end
+    if not IsBoss(xPlayer) then return {} end
+
+    local players = {}
+    local srcPed = GetPlayerPed(source)
+    local srcCoords = GetEntityCoords(srcPed)
+    local maxDistance = Config.HireDistance or 5.0
+
+    for _, playerId in pairs(ESX.GetPlayers()) do
+        local targetId = tonumber(playerId)
+
+        if targetId and targetId ~= source then
+            local targetPed = GetPlayerPed(targetId)
+            local targetCoords = GetEntityCoords(targetPed)
+            local distance = #(srcCoords - targetCoords)
+
+            if distance <= maxDistance then
+                table.insert(players, {
+                    id = targetId,
+                    name = GetPlayerName(targetId),
+                    distance = math.floor(distance * 10) / 10
+                })
+            end
+        end
+    end
+
+    return players
+end)
+
+lib.callback.register('lumi_bossapp:hirePlayer', function(source, targetId)
+    targetId = tonumber(targetId)
+
+    local xPlayer = ESX.GetPlayerFromId(source)
+    local xTarget = ESX.GetPlayerFromId(targetId)
+
+    if not xPlayer or not xTarget then
+        return false, 'Spieler nicht gefunden'
+    end
+
+    if not IsBoss(xPlayer) then
+        return false, 'Du bist kein Boss'
+    end
+
+    local srcPed = GetPlayerPed(source)
+    local targetPed = GetPlayerPed(targetId)
+
+    local srcCoords = GetEntityCoords(srcPed)
+    local targetCoords = GetEntityCoords(targetPed)
+
+    local maxDistance = Config.HireDistance or 5.0
+    local distance = #(srcCoords - targetCoords)
+
+    if distance > maxDistance then
+        return false, 'Spieler ist zu weit entfernt'
+    end
+
+    local job = xPlayer.getJob()
+    local startGrade = Config.HireStartGrade or 0
+	
+	local targetJob = xTarget.getJob()
+
+	if targetJob.name == job.name then
+		return false, 'Spieler arbeitet bereits in dieser Firma'
+	end
+
+    local gradeExists = MySQL.scalar.await(
+        'SELECT COUNT(*) FROM job_grades WHERE job_name = ? AND grade = ?',
+        { job.name, startGrade }
+    )
+
+    if tonumber(gradeExists) <= 0 then
+        return false, 'Start-Rang existiert nicht'
+    end
+
+    xTarget.setJob(job.name, startGrade)
+	--print('[BossHub Hire] target identifier:', xTarget.identifier)
+
+	local changed = MySQL.update.await(
+		'UPDATE users SET job = ?, job_grade = ? WHERE identifier = ? LIMIT 1',
+		{ job.name, startGrade, xTarget.identifier }
+	)
+
+	--print('[BossHub Hire] DB rows changed:', changed)
+
+    return true, ('%s wurde eingestellt'):format(GetPlayerName(targetId))
+end)
 
 lib.callback.register('lumi_bossapp:depositMoney', function(source, amount)
     local xPlayer = ESX.GetPlayerFromId(source)
@@ -242,3 +332,4 @@ lib.callback.register('lumi_bossapp:fireEmployee', function(source, identifier)
 
     return true
 end)
+
