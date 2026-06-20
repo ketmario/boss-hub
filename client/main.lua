@@ -15,6 +15,25 @@ RegisterNUICallback('lumi_bossapp:getEmployees', function(data, cb)
     cb(result or {})
 end)
 
+RegisterNUICallback('lumi_bossapp:getNearbyPlayers', function(data, cb)
+    local result = lib.callback.await(
+        'lumi_bossapp:getNearbyPlayers',
+        false
+    )
+
+    cb(result or {})
+end)
+
+RegisterNUICallback('lumi_bossapp:hirePlayer', function(data, cb)
+    local result = lib.callback.await(
+        'lumi_bossapp:hirePlayer',
+        false,
+        data.targetId
+    )
+
+    cb(result)
+end)
+
 RegisterNUICallback('lumi_bossapp:depositMoney', function(data, cb)
     local result = lib.callback.await(
         'lumi_bossapp:depositMoney',
@@ -90,14 +109,18 @@ RegisterNUICallback('lumi_bossapp:getDashboard', function(data, cb)
     })
 end)
 
+local APP_NAME = 'Boss Hub'
+local APP_CREATOR = 'Luminera Development'
+local APP_DESCRIPTION = 'Mobiles ESX Boss Menü für Firmen und Fraktionen.'
+
 local function registerApp()
     local added, reason = exports[PHONE_RESOURCE]:addCustomApp({
         id = APP_ID,
-        label = Config.AppName,
-        icon = ui .. 'icon.webp',
-        category = 'Business',
-        creator = Config.Creator,
-        description = Config.Description,
+		label = APP_NAME,
+		icon = ui .. 'icon.webp',
+		category = 'Business',
+		creator = APP_CREATOR,
+		description = APP_DESCRIPTION,
         age = '3+',
         appStoreOnly = false,
         price = 0,
